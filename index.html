@@ -1,0 +1,968 @@
+<!-- Kullanım: Malzeme, operasyon ve takım tipini seçip ölçüleri girin. “Öner” ile Vc/fz otomatik doldurulur, “Hesapla” ile sonuçları görün. -->
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CNC Kesme Değerleri Hesaplayıcı</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #0f141a;
+      --panel: #161d25;
+      --panel-2: #1d2630;
+      --text: #e7edf3;
+      --muted: #aab7c4;
+      --accent: #4ea8ff;
+      --accent-2: #7bd389;
+      --warn: #ff5c5c;
+      --border: #2a3542;
+    }
+    * {
+      box-sizing: border-box;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    header {
+      padding: 24px;
+      background: linear-gradient(135deg, #131b24, #0f141a);
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 {
+      margin: 0 0 8px 0;
+      font-size: 1.6rem;
+    }
+    header p {
+      margin: 0;
+      color: var(--muted);
+    }
+    main {
+      padding: 24px;
+      display: grid;
+      gap: 20px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .card h2 {
+      margin-top: 0;
+      font-size: 1.1rem;
+    }
+    label {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    input, select, button, textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+    input:focus, select:focus, button:focus, textarea:focus {
+      outline: 2px solid var(--accent);
+      border-color: transparent;
+    }
+    button {
+      cursor: pointer;
+      transition: transform 0.05s ease, background 0.2s ease;
+    }
+    button:hover {
+      transform: translateY(-1px);
+    }
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .button-row button {
+      flex: 1;
+      min-width: 150px;
+    }
+    .accent {
+      background: var(--accent);
+      color: #081321;
+      font-weight: 600;
+    }
+    .secondary {
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+    }
+    .success {
+      background: var(--accent-2);
+      color: #0b2014;
+      font-weight: 600;
+    }
+    .warning {
+      border-left: 4px solid var(--warn);
+      padding: 10px 12px;
+      background: rgba(255, 92, 92, 0.1);
+      border-radius: 8px;
+      color: #ffd6d6;
+    }
+    .result {
+      display: grid;
+      gap: 8px;
+    }
+    .result strong {
+      font-size: 1.2rem;
+    }
+    .pill {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #223042;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .two-col {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+    details {
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    summary {
+      cursor: pointer;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+    footer {
+      padding: 24px;
+      color: var(--muted);
+    }
+    @media (max-width: 600px) {
+      header h1 {
+        font-size: 1.3rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>CNC Kesme Değerleri Hesaplayıcı (HMC/VMC)</h1>
+    <p>Malzeme, operasyon ve takım bilgilerini seçin. Önerilen Vc/fz değerleriyle devir ve ilerlemeyi tek ekranda görün.</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Mod & Temel Seçimler</h2>
+      <div class="grid">
+        <div>
+          <label for="mode">Mod</label>
+          <select id="mode">
+            <option value="milling">Frezeleme</option>
+            <option value="turning">Tornalama (Insertli)</option>
+          </select>
+        </div>
+        <div>
+          <label for="machine">Tezgah tipi</label>
+          <select id="machine">
+            <option value="HMC">HMC</option>
+            <option value="VMC">VMC</option>
+          </select>
+        </div>
+        <div>
+          <label for="operation">Operasyon</label>
+          <select id="operation">
+            <option value="Kaba">Kaba</option>
+            <option value="Yarı finiş">Yarı finiş</option>
+            <option value="Finiş">Finiş</option>
+          </select>
+        </div>
+        <div>
+          <label for="priority">Öncelik</label>
+          <select id="priority">
+            <option value="low">Takım ömrü (düşük)</option>
+            <option value="mid" selected>Dengeli</option>
+            <option value="high">Performans (yüksek)</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Malzeme & Takım</h2>
+      <div class="grid">
+        <div>
+          <label for="materialGroup">Malzeme grubu</label>
+          <select id="materialGroup"></select>
+        </div>
+        <div>
+          <label for="materialSubtype">Malzeme alt türü</label>
+          <select id="materialSubtype"></select>
+        </div>
+        <div>
+          <label for="toolType">Takım tipi</label>
+          <select id="toolType">
+            <option>Insertli yüzey freze</option>
+            <option>Insertli parmak freze</option>
+            <option>Karbür parmak freze</option>
+          </select>
+        </div>
+        <div>
+          <label for="isoGroup">Uç/insert grubu</label>
+          <select id="isoGroup">
+            <option value="P">ISO P</option>
+            <option value="M">ISO M</option>
+            <option value="K">ISO K</option>
+            <option value="N">ISO N</option>
+            <option value="S">ISO S</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Ölçüler & Kesme Değerleri</h2>
+      <div class="grid">
+        <div>
+          <label for="diameter">Çap D (mm)</label>
+          <input type="number" id="diameter" min="0" step="0.1" value="50" />
+        </div>
+        <div class="milling-only">
+          <label for="teeth">Ağız sayısı z</label>
+          <input type="number" id="teeth" min="1" step="1" value="4" />
+        </div>
+        <div class="milling-only">
+          <label for="fz">fz (mm/diş)</label>
+          <input type="number" id="fz" min="0" step="0.001" value="0.12" />
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <button class="secondary" id="suggestBtn">fz & Vc öner</button>
+        </div>
+        <div>
+          <label for="vc">Vc (m/dak)</label>
+          <input type="number" id="vc" min="0" step="0.1" value="180" />
+        </div>
+        <div class="turning-only">
+          <label for="feedPerRev">f (mm/dev)</label>
+          <input type="number" id="feedPerRev" min="0" step="0.01" value="0.25" />
+        </div>
+      </div>
+
+      <details>
+        <summary>Gelişmiş ayarlar (opsiyonel)</summary>
+        <div class="grid">
+          <div>
+            <label for="ap">ap (mm)</label>
+            <input type="number" id="ap" min="0" step="0.1" value="2" />
+          </div>
+          <div>
+            <label for="ae">ae (mm)</label>
+            <input type="number" id="ae" min="0" step="0.1" value="20" />
+          </div>
+          <div>
+            <label for="fzCorrection">fz düzeltme (chip thinning)</label>
+            <input type="number" id="fzCorrection" min="0" step="0.01" value="1" />
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <section class="card">
+      <h2>Tezgah Limitleri</h2>
+      <div class="grid">
+        <div>
+          <label for="maxRpm">Maks rpm</label>
+          <input type="number" id="maxRpm" min="0" step="10" value="12000" />
+        </div>
+        <div>
+          <label for="maxFeed">Maks ilerleme (mm/dak)</label>
+          <input type="number" id="maxFeed" min="0" step="100" value="8000" />
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Sonuçlar</h2>
+      <div id="warnings"></div>
+      <div class="result">
+        <div class="pill" id="contextNote">-</div>
+        <div><strong>Vc:</strong> <span id="resultVc">-</span> m/dak</div>
+        <div><strong>Devir n:</strong> <span id="resultRpm">-</span> rpm</div>
+        <div><strong><span id="resultFzLabel">fz</span>:</strong> <span id="resultFz">-</span> <span id="resultFzUnit">mm/diş</span></div>
+        <div><strong>İlerleme Vf:</strong> <span id="resultVf">-</span> mm/dak</div>
+        <div><strong>Not:</strong> <span id="resultNote">Vc arttıkça rpm artar, fz arttıkça ilerleme artar.</span></div>
+      </div>
+      <div class="button-row" style="margin-top: 12px;">
+        <button class="accent" id="calcBtn">Hesapla</button>
+        <button class="success" id="copyBtn">Kopyala</button>
+        <button class="secondary" id="saveBtn">Preset kaydet</button>
+        <button class="secondary" id="loadBtn">Preset yükle</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Hızlı karşılaştırma</h2>
+      <div class="two-col" id="compareGrid"></div>
+    </section>
+
+    <section class="card">
+      <h2>Formüller</h2>
+      <ul>
+        <li>Devir (rpm): n = (1000 * Vc) / (π * D)</li>
+        <li>Freze ilerleme (mm/dak): Vf = n * z * fz</li>
+        <li>Tornada ilerleme (mm/dak): Vf = n * f</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Örnek senaryolar</h2>
+      <div class="button-row">
+        <button class="secondary" data-scenario="42CrMo4">42CrMo4 / Kaba / Insertli yüzey freze</button>
+        <button class="secondary" data-scenario="304">304 / Finiş / Karbür parmak freze</button>
+        <button class="secondary" data-scenario="Al">Alüminyum / Kaba / Karbür parmak freze</button>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <small>Not: Değerler öneri amaçlıdır. Kesme değerlerini takım üreticisi kataloğu ve tezgah koşullarına göre doğrulayın.</small>
+  </footer>
+
+  <script>
+    const DATA = {
+      "Çelik": {
+        subtypes: ["S235", "S355", "C45/1045", "42CrMo4"],
+        milling: {
+          "Kaba": {
+            "Insertli yüzey freze": { vc: [140, 200], fz: [0.15, 0.28] },
+            "Insertli parmak freze": { vc: [120, 180], fz: [0.12, 0.22] },
+            "Karbür parmak freze": { vc: [160, 220], fz: [0.08, 0.16] }
+          },
+          "Yarı finiş": {
+            "Insertli yüzey freze": { vc: [160, 220], fz: [0.12, 0.22] },
+            "Insertli parmak freze": { vc: [140, 200], fz: [0.10, 0.18] },
+            "Karbür parmak freze": { vc: [180, 260], fz: [0.06, 0.14] }
+          },
+          "Finiş": {
+            "Insertli yüzey freze": { vc: [180, 240], fz: [0.08, 0.16] },
+            "Insertli parmak freze": { vc: [160, 220], fz: [0.06, 0.12] },
+            "Karbür parmak freze": { vc: [200, 280], fz: [0.04, 0.10] }
+          }
+        },
+        turning: {
+          "Kaba": { vc: [140, 200], f: [0.22, 0.35] },
+          "Yarı finiş": { vc: [160, 220], f: [0.16, 0.28] },
+          "Finiş": { vc: [180, 240], f: [0.10, 0.20] }
+        }
+      },
+      "Paslanmaz": {
+        subtypes: ["304", "316", "430"],
+        milling: {
+          "Kaba": {
+            "Insertli yüzey freze": { vc: [90, 140], fz: [0.12, 0.22] },
+            "Insertli parmak freze": { vc: [80, 120], fz: [0.10, 0.18] },
+            "Karbür parmak freze": { vc: [110, 160], fz: [0.06, 0.12] }
+          },
+          "Yarı finiş": {
+            "Insertli yüzey freze": { vc: [110, 160], fz: [0.10, 0.18] },
+            "Insertli parmak freze": { vc: [90, 140], fz: [0.08, 0.15] },
+            "Karbür parmak freze": { vc: [130, 180], fz: [0.05, 0.10] }
+          },
+          "Finiş": {
+            "Insertli yüzey freze": { vc: [130, 180], fz: [0.08, 0.14] },
+            "Insertli parmak freze": { vc: [110, 160], fz: [0.06, 0.12] },
+            "Karbür parmak freze": { vc: [150, 200], fz: [0.04, 0.08] }
+          }
+        },
+        turning: {
+          "Kaba": { vc: [90, 140], f: [0.18, 0.30] },
+          "Yarı finiş": { vc: [110, 160], f: [0.14, 0.24] },
+          "Finiş": { vc: [130, 180], f: [0.08, 0.18] }
+        }
+      },
+      "Dökme": {
+        subtypes: ["GG25", "GG30", "GJS400"],
+        milling: {
+          "Kaba": {
+            "Insertli yüzey freze": { vc: [180, 260], fz: [0.16, 0.30] },
+            "Insertli parmak freze": { vc: [160, 240], fz: [0.14, 0.24] },
+            "Karbür parmak freze": { vc: [200, 280], fz: [0.10, 0.18] }
+          },
+          "Yarı finiş": {
+            "Insertli yüzey freze": { vc: [200, 280], fz: [0.14, 0.24] },
+            "Insertli parmak freze": { vc: [180, 260], fz: [0.12, 0.20] },
+            "Karbür parmak freze": { vc: [220, 320], fz: [0.08, 0.16] }
+          },
+          "Finiş": {
+            "Insertli yüzey freze": { vc: [220, 300], fz: [0.10, 0.18] },
+            "Insertli parmak freze": { vc: [200, 280], fz: [0.08, 0.14] },
+            "Karbür parmak freze": { vc: [240, 340], fz: [0.06, 0.12] }
+          }
+        },
+        turning: {
+          "Kaba": { vc: [180, 260], f: [0.22, 0.38] },
+          "Yarı finiş": { vc: [200, 280], f: [0.16, 0.28] },
+          "Finiş": { vc: [220, 300], f: [0.10, 0.20] }
+        }
+      },
+      "Alüminyum": {
+        subtypes: ["6061", "6082", "7075"],
+        milling: {
+          "Kaba": {
+            "Insertli yüzey freze": { vc: [400, 600], fz: [0.20, 0.35] },
+            "Insertli parmak freze": { vc: [350, 520], fz: [0.18, 0.30] },
+            "Karbür parmak freze": { vc: [450, 700], fz: [0.12, 0.25] }
+          },
+          "Yarı finiş": {
+            "Insertli yüzey freze": { vc: [450, 650], fz: [0.18, 0.30] },
+            "Insertli parmak freze": { vc: [400, 600], fz: [0.16, 0.26] },
+            "Karbür parmak freze": { vc: [500, 800], fz: [0.10, 0.20] }
+          },
+          "Finiş": {
+            "Insertli yüzey freze": { vc: [500, 700], fz: [0.14, 0.24] },
+            "Insertli parmak freze": { vc: [450, 650], fz: [0.12, 0.22] },
+            "Karbür parmak freze": { vc: [600, 900], fz: [0.08, 0.18] }
+          }
+        },
+        turning: {
+          "Kaba": { vc: [350, 550], f: [0.25, 0.40] },
+          "Yarı finiş": { vc: [400, 600], f: [0.18, 0.30] },
+          "Finiş": { vc: [450, 650], f: [0.12, 0.22] }
+        }
+      },
+      "Titanyum": {
+        subtypes: ["Ti-6Al-4V", "Grade 2", "Grade 5"],
+        milling: {
+          "Kaba": {
+            "Insertli yüzey freze": { vc: [50, 80], fz: [0.08, 0.16] },
+            "Insertli parmak freze": { vc: [45, 70], fz: [0.07, 0.12] },
+            "Karbür parmak freze": { vc: [60, 90], fz: [0.04, 0.08] }
+          },
+          "Yarı finiş": {
+            "Insertli yüzey freze": { vc: [55, 90], fz: [0.06, 0.12] },
+            "Insertli parmak freze": { vc: [50, 80], fz: [0.05, 0.10] },
+            "Karbür parmak freze": { vc: [70, 100], fz: [0.03, 0.06] }
+          },
+          "Finiş": {
+            "Insertli yüzey freze": { vc: [60, 100], fz: [0.05, 0.10] },
+            "Insertli parmak freze": { vc: [55, 90], fz: [0.04, 0.08] },
+            "Karbür parmak freze": { vc: [80, 120], fz: [0.02, 0.05] }
+          }
+        },
+        turning: {
+          "Kaba": { vc: [50, 80], f: [0.12, 0.22] },
+          "Yarı finiş": { vc: [55, 90], f: [0.10, 0.18] },
+          "Finiş": { vc: [60, 100], f: [0.06, 0.12] }
+        }
+      },
+      "Nikel bazlı": {
+        subtypes: ["Inconel 718", "Inconel 625", "Hastelloy C276"],
+        milling: {
+          "Kaba": {
+            "Insertli yüzey freze": { vc: [40, 70], fz: [0.08, 0.14] },
+            "Insertli parmak freze": { vc: [35, 60], fz: [0.06, 0.12] },
+            "Karbür parmak freze": { vc: [45, 80], fz: [0.04, 0.08] }
+          },
+          "Yarı finiş": {
+            "Insertli yüzey freze": { vc: [45, 80], fz: [0.06, 0.12] },
+            "Insertli parmak freze": { vc: [40, 70], fz: [0.05, 0.10] },
+            "Karbür parmak freze": { vc: [50, 90], fz: [0.03, 0.06] }
+          },
+          "Finiş": {
+            "Insertli yüzey freze": { vc: [50, 90], fz: [0.05, 0.10] },
+            "Insertli parmak freze": { vc: [45, 80], fz: [0.04, 0.08] },
+            "Karbür parmak freze": { vc: [55, 100], fz: [0.02, 0.05] }
+          }
+        },
+        turning: {
+          "Kaba": { vc: [40, 70], f: [0.10, 0.18] },
+          "Yarı finiş": { vc: [45, 80], f: [0.08, 0.15] },
+          "Finiş": { vc: [50, 90], f: [0.05, 0.10] }
+        }
+      }
+    };
+
+    const ISO_MULTIPLIER = {
+      P: { vc: 1.0, fz: 1.0 },
+      M: { vc: 0.85, fz: 0.9 },
+      K: { vc: 0.9, fz: 0.95 },
+      N: { vc: 1.35, fz: 1.1 },
+      S: { vc: 0.6, fz: 0.85 }
+    };
+
+    const priorityFactor = (priority) => {
+      if (priority === "low") return 0;
+      if (priority === "high") return 1;
+      return 0.5;
+    };
+
+    const round = (value, digits = 0) => {
+      const factor = Math.pow(10, digits);
+      return Math.round(value * factor) / factor;
+    };
+
+    const select = (id) => document.getElementById(id);
+
+    const elements = {
+      mode: select("mode"),
+      machine: select("machine"),
+      operation: select("operation"),
+      priority: select("priority"),
+      materialGroup: select("materialGroup"),
+      materialSubtype: select("materialSubtype"),
+      toolType: select("toolType"),
+      isoGroup: select("isoGroup"),
+      diameter: select("diameter"),
+      teeth: select("teeth"),
+      fz: select("fz"),
+      feedPerRev: select("feedPerRev"),
+      vc: select("vc"),
+      ap: select("ap"),
+      ae: select("ae"),
+      fzCorrection: select("fzCorrection"),
+      maxRpm: select("maxRpm"),
+      maxFeed: select("maxFeed"),
+      warnings: select("warnings"),
+      resultVc: select("resultVc"),
+      resultRpm: select("resultRpm"),
+      resultFzLabel: select("resultFzLabel"),
+      resultFz: select("resultFz"),
+      resultFzUnit: select("resultFzUnit"),
+      resultVf: select("resultVf"),
+      resultNote: select("resultNote"),
+      contextNote: select("contextNote"),
+      compareGrid: select("compareGrid")
+    };
+
+    const populateMaterials = () => {
+      elements.materialGroup.innerHTML = "";
+      Object.keys(DATA).forEach((group) => {
+        const option = document.createElement("option");
+        option.value = group;
+        option.textContent = group;
+        elements.materialGroup.appendChild(option);
+      });
+      updateSubtypes();
+    };
+
+    const updateSubtypes = () => {
+      const group = elements.materialGroup.value;
+      elements.materialSubtype.innerHTML = "";
+      DATA[group].subtypes.forEach((subtype) => {
+        const option = document.createElement("option");
+        option.value = subtype;
+        option.textContent = subtype;
+        elements.materialSubtype.appendChild(option);
+      });
+    };
+
+    const getRange = () => {
+      const group = elements.materialGroup.value;
+      const op = elements.operation.value;
+      const tool = elements.toolType.value;
+      const iso = elements.isoGroup.value;
+      const mode = elements.mode.value;
+      const multiplier = ISO_MULTIPLIER[iso] || ISO_MULTIPLIER.P;
+
+      if (mode === "turning") {
+        const base = DATA[group].turning[op];
+        return {
+          vc: [base.vc[0] * multiplier.vc, base.vc[1] * multiplier.vc],
+          f: [base.f[0] * multiplier.fz, base.f[1] * multiplier.fz]
+        };
+      }
+
+      const base = DATA[group].milling[op][tool];
+      return {
+        vc: [base.vc[0] * multiplier.vc, base.vc[1] * multiplier.vc],
+        fz: [base.fz[0] * multiplier.fz, base.fz[1] * multiplier.fz]
+      };
+    };
+
+    const pickFromRange = (range, priority) => {
+      const t = priorityFactor(priority);
+      return range[0] + (range[1] - range[0]) * t;
+    };
+
+    const calculateRpm = (vc, diameter) => (1000 * vc) / (Math.PI * diameter);
+    const calculateFeedMilling = (rpm, teeth, fz) => rpm * teeth * fz;
+    const calculateFeedTurning = (rpm, feedPerRev) => rpm * feedPerRev;
+
+    const showWarning = (message) => {
+      const div = document.createElement("div");
+      div.className = "warning";
+      div.textContent = message;
+      elements.warnings.appendChild(div);
+    };
+
+    const clearWarnings = () => {
+      elements.warnings.innerHTML = "";
+    };
+
+    const validateInputs = () => {
+      const diameter = Number(elements.diameter.value);
+      const rpmMax = Number(elements.maxRpm.value);
+      const feedMax = Number(elements.maxFeed.value);
+      const mode = elements.mode.value;
+
+      if (!diameter || diameter <= 0) return "Çap (D) sıfır veya negatif olamaz.";
+      if (rpmMax <= 0 || feedMax <= 0) return "Maks limitler pozitif olmalıdır.";
+      if (mode === "milling") {
+        const teeth = Number(elements.teeth.value);
+        const fz = Number(elements.fz.value);
+        if (!teeth || teeth <= 0) return "Ağız sayısı (z) pozitif olmalıdır.";
+        if (!fz || fz <= 0) return "fz değeri pozitif olmalıdır.";
+      } else {
+        const feed = Number(elements.feedPerRev.value);
+        if (!feed || feed <= 0) return "f (mm/dev) değeri pozitif olmalıdır.";
+      }
+      return "";
+    };
+
+    const computeResults = (priorityOverride) => {
+      const error = validateInputs();
+      if (error) {
+        return { error };
+      }
+
+      const mode = elements.mode.value;
+      const diameter = Number(elements.diameter.value);
+      const teeth = Number(elements.teeth.value);
+      const fz = Number(elements.fz.value);
+      const feedPerRev = Number(elements.feedPerRev.value);
+      const fzCorrection = Number(elements.fzCorrection.value) || 1;
+      const vcInput = Number(elements.vc.value);
+      const priority = priorityOverride || elements.priority.value;
+      const maxRpm = Number(elements.maxRpm.value);
+      const maxFeed = Number(elements.maxFeed.value);
+      const range = getRange();
+
+      let vc = vcInput;
+      if (!vc || vc <= 0) {
+        vc = pickFromRange(range.vc, priority);
+      }
+
+      let fzUsed = fz;
+      let feedUsed = feedPerRev;
+      if (mode === "milling") {
+        if (!fz || fz <= 0) {
+          fzUsed = pickFromRange(range.fz, priority);
+        }
+        fzUsed *= fzCorrection;
+      } else {
+        if (!feedPerRev || feedPerRev <= 0) {
+          feedUsed = pickFromRange(range.f, priority);
+        }
+      }
+
+      let rpm = calculateRpm(vc, diameter);
+      let vf = mode === "milling"
+        ? calculateFeedMilling(rpm, teeth, fzUsed)
+        : calculateFeedTurning(rpm, feedUsed);
+
+      let clipped = false;
+      let clippedNote = "";
+
+      if (rpm > maxRpm) {
+        clipped = true;
+        rpm = maxRpm;
+        vf = mode === "milling"
+          ? calculateFeedMilling(rpm, teeth, fzUsed)
+          : calculateFeedTurning(rpm, feedUsed);
+        clippedNote += `rpm limiti aşıldı, ${maxRpm} rpm'e kırpıldı. `;
+      }
+
+      if (vf > maxFeed) {
+        clipped = true;
+        if (mode === "milling") {
+          const newFz = maxFeed / (rpm * teeth);
+          fzUsed = newFz;
+          vf = maxFeed;
+          clippedNote += "İlerleme limiti aşıldı, fz düşürüldü. ";
+        } else {
+          const newFeed = maxFeed / rpm;
+          feedUsed = newFeed;
+          vf = maxFeed;
+          clippedNote += "İlerleme limiti aşıldı, f (mm/dev) düşürüldü. ";
+        }
+      }
+
+      return {
+        vc: round(vc, 1),
+        rpm: Math.round(rpm),
+        fz: mode === "milling" ? round(fzUsed, 3) : "-",
+        feedPerRev: mode === "turning" ? round(feedUsed, 3) : "-",
+        vf: Math.round(vf),
+        clipped,
+        clippedNote
+      };
+    };
+
+    const updateResult = (results) => {
+      if (!results) return;
+      const mode = elements.mode.value;
+      const context = `${elements.machine.value} • ${elements.operation.value} • ${elements.materialGroup.value} (${elements.materialSubtype.value})`;
+      elements.contextNote.textContent = context;
+      elements.resultVc.textContent = results.vc;
+      elements.resultRpm.textContent = results.rpm;
+      elements.resultFzLabel.textContent = mode === "milling" ? "fz" : "f";
+      elements.resultFzUnit.textContent = mode === "milling" ? "mm/diş" : "mm/dev";
+      elements.resultFz.textContent = mode === "milling" ? results.fz : results.feedPerRev;
+      elements.resultVf.textContent = results.vf;
+
+      if (results.clipped) {
+        showWarning(`Limit uyarısı: ${results.clippedNote} Yeni öneri limitlere göre hesaplandı.`);
+      }
+    };
+
+    const calculate = () => {
+      clearWarnings();
+      const results = computeResults();
+      if (results?.error) {
+        showWarning(results.error);
+        return null;
+      }
+      updateResult(results);
+      updateCompare();
+      return results;
+    };
+
+    const suggestValues = () => {
+      const range = getRange();
+      const priority = elements.priority.value;
+      const vcValue = pickFromRange(range.vc, priority);
+      elements.vc.value = round(vcValue, 1);
+
+      if (elements.mode.value === "milling") {
+        const fzValue = pickFromRange(range.fz, priority);
+        elements.fz.value = round(fzValue, 3);
+      } else {
+        const fValue = pickFromRange(range.f, priority);
+        elements.feedPerRev.value = round(fValue, 3);
+      }
+    };
+
+    const updateCompare = () => {
+      const modes = [
+        { key: "low", label: "Takım ömrü" },
+        { key: "mid", label: "Dengeli" },
+        { key: "high", label: "Performans" }
+      ];
+      elements.compareGrid.innerHTML = "";
+      modes.forEach((modeInfo) => {
+        const result = computeResults(modeInfo.key);
+        if (!result || result.error) return;
+        const card = document.createElement("div");
+        card.className = "card";
+        const fzLabel = elements.mode.value === "milling" ? `fz: ${result.fz} mm/diş` : `f: ${result.feedPerRev} mm/dev`;
+        card.innerHTML = `
+          <strong>${modeInfo.label}</strong>
+          <div>Vc: ${result.vc} m/dak</div>
+          <div>n: ${result.rpm} rpm</div>
+          <div>${fzLabel}</div>
+          <div>Vf: ${result.vf} mm/dak</div>
+        `;
+        elements.compareGrid.appendChild(card);
+      });
+    };
+
+    const copyResults = async () => {
+      const mode = elements.mode.value;
+      const text = [
+        "CNC Kesme Değerleri",
+        `Tezgah: ${elements.machine.value}`,
+        `Operasyon: ${elements.operation.value}`,
+        `Malzeme: ${elements.materialGroup.value} (${elements.materialSubtype.value})`,
+        `Takım: ${elements.toolType.value} / ISO ${elements.isoGroup.value}`,
+        `D: ${elements.diameter.value} mm`,
+        `Vc: ${elements.resultVc.textContent} m/dak`,
+        `n: ${elements.resultRpm.textContent} rpm`,
+        mode === "milling"
+          ? `fz: ${elements.resultFz.textContent} mm/diş`
+          : `f: ${elements.resultFz.textContent} mm/dev`,
+        `Vf: ${elements.resultVf.textContent} mm/dak`
+      ].join("\n");
+
+      try {
+        await navigator.clipboard.writeText(text);
+        showWarning("Sonuçlar panoya kopyalandı.");
+      } catch (error) {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+        showWarning("Sonuçlar panoya kopyalandı (alternatif yöntem). ");
+      }
+    };
+
+    const savePreset = () => {
+      const preset = {
+        mode: elements.mode.value,
+        machine: elements.machine.value,
+        operation: elements.operation.value,
+        priority: elements.priority.value,
+        materialGroup: elements.materialGroup.value,
+        materialSubtype: elements.materialSubtype.value,
+        toolType: elements.toolType.value,
+        isoGroup: elements.isoGroup.value,
+        diameter: elements.diameter.value,
+        teeth: elements.teeth.value,
+        fz: elements.fz.value,
+        feedPerRev: elements.feedPerRev.value,
+        vc: elements.vc.value,
+        ap: elements.ap.value,
+        ae: elements.ae.value,
+        fzCorrection: elements.fzCorrection.value,
+        maxRpm: elements.maxRpm.value,
+        maxFeed: elements.maxFeed.value
+      };
+      localStorage.setItem("cncPreset", JSON.stringify(preset));
+      showWarning("Preset kaydedildi.");
+    };
+
+    const loadPreset = () => {
+      const saved = localStorage.getItem("cncPreset");
+      if (!saved) {
+        showWarning("Kayıtlı preset bulunamadı.");
+        return;
+      }
+      const preset = JSON.parse(saved);
+      Object.keys(preset).forEach((key) => {
+        if (elements[key]) elements[key].value = preset[key];
+      });
+      updateSubtypes();
+      elements.materialSubtype.value = preset.materialSubtype || elements.materialSubtype.value;
+      applyModeVisibility();
+      calculate();
+    };
+
+    const applyModeVisibility = () => {
+      const turning = elements.mode.value === "turning";
+      elements.teeth.disabled = turning;
+      elements.fz.disabled = turning;
+      elements.feedPerRev.disabled = !turning;
+      document.querySelectorAll(".milling-only").forEach((field) => {
+        field.hidden = turning;
+      });
+      document.querySelectorAll(".turning-only").forEach((field) => {
+        field.hidden = !turning;
+      });
+      const suggestLabel = turning ? "f & Vc öner" : "fz & Vc öner";
+      document.getElementById("suggestBtn").textContent = suggestLabel;
+    };
+
+    const scenarioMap = {
+      "42CrMo4": {
+        materialGroup: "Çelik",
+        materialSubtype: "42CrMo4",
+        operation: "Kaba",
+        toolType: "Insertli yüzey freze",
+        diameter: 63,
+        teeth: 5
+      },
+      "304": {
+        materialGroup: "Paslanmaz",
+        materialSubtype: "304",
+        operation: "Finiş",
+        toolType: "Karbür parmak freze",
+        diameter: 12,
+        teeth: 4
+      },
+      "Al": {
+        materialGroup: "Alüminyum",
+        materialSubtype: "6061",
+        operation: "Kaba",
+        toolType: "Karbür parmak freze",
+        diameter: 16,
+        teeth: 3
+      }
+    };
+
+    const applyScenario = (key) => {
+      const scenario = scenarioMap[key];
+      if (!scenario) return;
+      elements.materialGroup.value = scenario.materialGroup;
+      updateSubtypes();
+      elements.materialSubtype.value = scenario.materialSubtype;
+      elements.operation.value = scenario.operation;
+      elements.toolType.value = scenario.toolType;
+      elements.diameter.value = scenario.diameter;
+      elements.teeth.value = scenario.teeth;
+      suggestValues();
+      calculate();
+    };
+
+    const init = () => {
+      populateMaterials();
+      applyModeVisibility();
+      suggestValues();
+      calculate();
+    };
+
+    elements.materialGroup.addEventListener("change", () => {
+      updateSubtypes();
+      suggestValues();
+      calculate();
+    });
+
+    [elements.operation, elements.toolType, elements.isoGroup, elements.priority].forEach((el) => {
+      el.addEventListener("change", () => {
+        suggestValues();
+        calculate();
+      });
+    });
+
+    elements.mode.addEventListener("change", () => {
+      applyModeVisibility();
+      suggestValues();
+      calculate();
+    });
+
+    document.getElementById("suggestBtn").addEventListener("click", () => {
+      suggestValues();
+      calculate();
+    });
+
+    document.getElementById("calcBtn").addEventListener("click", () => {
+      calculate();
+    });
+
+    document.getElementById("copyBtn").addEventListener("click", () => {
+      copyResults();
+    });
+
+    document.getElementById("saveBtn").addEventListener("click", () => {
+      savePreset();
+    });
+
+    document.getElementById("loadBtn").addEventListener("click", () => {
+      loadPreset();
+    });
+
+    document.querySelectorAll("[data-scenario]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        applyScenario(event.currentTarget.dataset.scenario);
+      });
+    });
+
+    window.addEventListener("load", init);
+  </script>
+</body>
+</html>
